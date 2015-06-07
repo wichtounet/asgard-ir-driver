@@ -11,6 +11,8 @@ extern "C" {
 #include <lirc/lirc_client.h>
 }
 
+static const std::size_t UNIX_PATH_MAX = 108;
+
 void ir_received(char* raw_code){
     std::string full_code(raw_code);
 
