@@ -5,7 +5,7 @@
 
 extern "C" {
 #include <lirc/lirc_client.h>
-};
+}
 
 void ir_received(char* raw_code){
     std::string full_code(raw_code);
