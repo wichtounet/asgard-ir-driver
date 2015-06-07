@@ -11,7 +11,7 @@ void ir_received(char* raw_code){
     std::string full_code(raw_code);
 
     auto code_end = full_code.find(' ');
-    std::string code(full_code.begin(), code_end);
+    std::string code(0, code_end);
 
     auto repeat_end = full_code.find(' ', code_end + 1);
     std::string repeat(code_end + 1, repeat_end);
