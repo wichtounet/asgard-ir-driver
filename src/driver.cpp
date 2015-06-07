@@ -11,9 +11,14 @@ extern "C" {
 #include <lirc/lirc_client.h>
 }
 
-static const std::size_t UNIX_PATH_MAX = 108;
+namespace {
 
-void ir_received(char* raw_code){
+const std::size_t UNIX_PATH_MAX = 108;
+
+//Buffer
+char buffer[4096];
+
+void ir_received(int socket_fd, char* raw_code){
     std::string full_code(raw_code);
 
     auto code_end = full_code.find(' ');
@@ -25,10 +30,14 @@ void ir_received(char* raw_code){
     auto key_end = full_code.find(' ', repeat_end + 1);
     std::string key(full_code.begin() + repeat_end + 1, full_code.begin() + key_end);
 
-    std::cout << "Code: " << code << std::endl;
-    std::cout << "Repeat: " << repeat << std::endl;
-    std::cout << "Key: " << key << std::endl;
+    std::cout << "asgard:ir: Received: " << code << ":" << repeat << ":" << key << std::endl;
+
+    //Send the event to the server
+    auto nbytes = snprintf(buffer, 4096, "EVENT IR %s", key.c_str());
+    write(socket_fd, buffer, nbytes);
 }
+
+} //End of anonymous namespace
 
 int main(){
     //Initiate LIRC. Exit on failure
@@ -57,16 +66,6 @@ int main(){
         return 1;
     }
 
-    char buffer[4096];
-
-    auto nbytes = snprintf(buffer, 4096, "hello from a client");
-    write(socket_fd, buffer, nbytes);
-
-    nbytes = read(socket_fd, buffer, 4096);
-    buffer[nbytes] = 0;
-
-    printf("MESSAGE FROM SERVER: %s\n", buffer);
-
     //Read the default LIRC config
     struct lirc_config* config;
     if(lirc_readconfig(NULL,&config,NULL)==0){
@@ -77,7 +76,7 @@ int main(){
             //If code = NULL, nothing was returned from LIRC socket
             if(code){
                 //Send code further
-                ir_received(code);
+                ir_received(socket_fd, code);
 
                 //Need to free up code before the next loop
                 free(code);
