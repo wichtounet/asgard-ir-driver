@@ -11,13 +11,13 @@ void ir_received(char* raw_code){
     std::string full_code(raw_code);
 
     auto code_end = full_code.find(' ');
-    std::string code(0, code_end);
+    std::string code(full_code.begin(), full_code.begin() + code_end);
 
     auto repeat_end = full_code.find(' ', code_end + 1);
-    std::string repeat(code_end + 1, repeat_end);
+    std::string repeat(full_code.begin() + code_end + 1, full_code.begin() + repeat_end);
 
     auto key_end = full_code.find(' ', repeat_end + 1);
-    std::string key(repeat_end + 1, key_end);
+    std::string key(full_code.begin() + repeat_end + 1, full_code.begin() + key_end);
 
     std::cout << "Code: " << code << std::endl;
     std::cout << "Repeat: " << repeat << std::endl;
