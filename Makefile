@@ -2,7 +2,7 @@ default: release
 
 .PHONY: default release debug all clean
 
-include make-utils/flags.mk
+include make-utils/flags-pi.mk
 include make-utils/cpp-utils.mk
 
 CXX_FLAGS += -pedantic
