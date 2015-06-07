@@ -1,4 +1,7 @@
 #include <iostream>
+#include <cstdlib>
+#include <cstdio>
+#include <cstring>
 
 extern "C" {
 #include <lirc/lirc_client.h>
@@ -10,8 +13,9 @@ void ir_received(char* code){
 
 int main(){
     //Initiate LIRC. Exit on failure
-    if(lirc_init("lirc",1)==-1){
-        return EXIT_FAILURE;
+    char lirc_name[] = "lirc";
+    if(lirc_init(lirc_name, 1) == -1){
+        return 1;
     }
 
     struct lirc_config* config;
