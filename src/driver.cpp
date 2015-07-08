@@ -75,8 +75,8 @@ int main(){
     }
 
     //Register the actuator
-    auto nbytes = snprintf(write_write_buffer, 4096, "REG_ACTUATOR ir_remote");
-    write(socket_fd, write_write_buffer, nbytes);
+    auto nbytes = snprintf(write_buffer, 4096, "REG_ACTUATOR ir_remote");
+    write(socket_fd, write_buffer, nbytes);
 
     //Get the response from the server
     nbytes = read(socket_fd, receive_buffer, 4096);
