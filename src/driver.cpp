@@ -23,9 +23,10 @@ namespace {
 const std::size_t UNIX_PATH_MAX = 108;
 
 //Buffer
-char buffer[4096];
+char write_buffer[4096];
+char receive_buffer[4096];
 
-void ir_received(int socket_fd, char* raw_code){
+void ir_received(int socket_fd, char* raw_code, int actuator){
     std::string full_code(raw_code);
 
     auto code_end = full_code.find(' ');
@@ -40,8 +41,8 @@ void ir_received(int socket_fd, char* raw_code){
     std::cout << "asgard:ir: Received: " << code << ":" << repeat << ":" << key << std::endl;
 
     //Send the event to the server
-    auto nbytes = snprintf(buffer, 4096, "EVENT IR %s", key.c_str());
-    write(socket_fd, buffer, nbytes);
+    auto nbytes = snprintf(write_buffer, 4096, "EVENT %d %s", actuator, key.c_str());
+    write(socket_fd, write_buffer, nbytes);
 }
 
 } //End of anonymous namespace
@@ -73,6 +74,24 @@ int main(){
         return 1;
     }
 
+    //Register the actuator
+    auto nbytes = snprintf(write_write_buffer, 4096, "REG_ACTUATOR ir_remote");
+    write(socket_fd, write_write_buffer, nbytes);
+
+    //Get the response from the server
+    nbytes = read(socket_fd, receive_buffer, 4096);
+
+    if(!nbytes){
+        std::cout << "asgard:ir: failed to register actuator" << std::endl;
+        return 1;
+    }
+
+    receive_buffer[nbytes] = 0;
+
+    //Parse the actuator id
+    int actuator = atoi(receive_buffer);
+    std::cout << "remote actuator: " << actuator << std::endl;
+
     //Read the default LIRC config
     struct lirc_config* config;
     if(lirc_readconfig(NULL,&config,NULL)==0){
@@ -83,7 +102,7 @@ int main(){
             //If code = NULL, nothing was returned from LIRC socket
             if(code){
                 //Send code further
-                ir_received(socket_fd, code);
+                ir_received(socket_fd, code, actuator);
 
                 //Need to free up code before the next loop
                 free(code);
@@ -98,7 +117,7 @@ int main(){
 
     //Closes LIRC
     lirc_deinit();
- 
+
     //Close the socket
     close(socket_fd);
 
