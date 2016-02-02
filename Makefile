@@ -1,7 +1,7 @@
 user=pi
 pi=192.168.20.161
 password=raspberry
-dir=/home/${user}/asgard/asgard-server/
+dir=/home/${user}/asgard/asgard-ir-driver/
 
 default: release
 
@@ -23,7 +23,10 @@ debug: debug_ir_driver
 all: release release_debug debug
 
 run: release
-	./release/bin/ir_driver
+	sudo ./release/bin/ir_driver
+
+remote_clean:
+	sshpass -p ${password} ssh ${user}@${pi} "cd ${dir} && make clean"
 
 remote_make:
 	sshpass -p ${password} scp Makefile ${user}@${pi}:${dir}/
