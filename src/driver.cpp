@@ -21,12 +21,59 @@ extern "C" {
 namespace {
 
 const std::size_t UNIX_PATH_MAX = 108;
+const std::size_t buffer_size = 4096;
 
-//Buffer
-char write_buffer[4096];
-char receive_buffer[4096];
+// Configuration (this should be in a configuration file)
+const char* server_socket_path = "/tmp/asgard_socket";
+const char* client_socket_path = "/tmp/asgard_ir_socket";
 
-void ir_received(int socket_fd, char* raw_code, int actuator){
+//Buffers
+char write_buffer[buffer_size + 1];
+char receive_buffer[buffer_size + 1];
+
+// The socket file descriptor
+int socket_fd;
+
+// The socket addresses
+struct sockaddr_un client_address;
+struct sockaddr_un server_address;
+
+// The remote IDs
+int source_id = -1;
+int button_actuator_id = -1;
+
+void stop(){
+    std::cout << "asgard:ir: stop the driver" << std::endl;
+
+    //Closes LIRC
+    lirc_deinit();
+
+    // Unregister the button actuator, if necessary
+    if(temperature_sensor_id >= 0){
+        auto nbytes = snprintf(write_buffer, buffer_size, "UNREG_ACTUATOR %d %d", source_id, button_actuator_id);
+        sendto(socket_fd, write_buffer, nbytes, 0, (struct sockaddr *) &server_address, sizeof(struct sockaddr_un));
+    }
+
+    // Unregister the source, if necessary
+    if(source_id >= 0){
+        auto nbytes = snprintf(write_buffer, buffer_size, "UNREG_SOURCE %d", source_id);
+        sendto(socket_fd, write_buffer, nbytes, 0, (struct sockaddr *) &server_address, sizeof(struct sockaddr_un));
+    }
+
+    // Unlink the client socket
+    unlink(client_socket_path);
+
+    // Close the socket
+    close(socket_fd);
+}
+
+void terminate(int){
+    stop();
+
+    std::exit(0);
+}
+
+void ir_received(char* raw_code){
     std::string full_code(raw_code);
 
     auto code_end = full_code.find(' ');
@@ -41,8 +88,8 @@ void ir_received(int socket_fd, char* raw_code, int actuator){
     std::cout << "asgard:ir: Received: " << code << ":" << repeat << ":" << key << std::endl;
 
     //Send the event to the server
-    auto nbytes = snprintf(write_buffer, 4096, "EVENT %d %s", actuator, key.c_str());
-    write(socket_fd, write_buffer, nbytes);
+    auto nbytes = snprintf(write_buffer, buffer_size, "EVENT %d %d %s", source_id, button_actuator_id, key.c_str());
+    sendto(socket_fd, write_buffer, nbytes, 0, (struct sockaddr *) &server_address, sizeof(struct sockaddr_un));
 }
 
 } //End of anonymous namespace
@@ -55,42 +102,59 @@ int main(){
         return 1;
     }
 
-    //Open the socket
-    auto socket_fd = socket(PF_UNIX, SOCK_STREAM, 0);
+    // Open the socket
+    socket_fd = socket(AF_UNIX, SOCK_DGRAM, 0);
     if(socket_fd < 0){
-        std::cout << "asgard:ir: socket() failed" << std::endl;
+        std::cerr << "asgard:ir: socket() failed" << std::endl;
         return 1;
     }
 
-    //Init the address
-    struct sockaddr_un address;
-    memset(&address, 0, sizeof(struct sockaddr_un));
-    address.sun_family = AF_UNIX;
-    snprintf(address.sun_path, UNIX_PATH_MAX, "/tmp/asgard_socket");
+    // Init the client address
+    memset(&client_address, 0, sizeof(struct sockaddr_un));
+    client_address.sun_family = AF_UNIX;
+    snprintf(client_address.sun_path, UNIX_PATH_MAX, client_socket_path);
 
-    //Connect to the server
-    if(connect(socket_fd, (struct sockaddr *) &address, sizeof(struct sockaddr_un)) != 0){
-        std::cout << "asgard:ir: connect() failed" << std::endl;
+    // Unlink the client socket
+    unlink(client_socket_path);
+
+    // Bind to client socket
+    if(bind(socket_fd, (const struct sockaddr *) &client_address, sizeof(struct sockaddr_un)) < 0){
+        std::cerr << "asgard:ir: bind() failed" << std::endl;
         return 1;
     }
 
-    //Register the actuator
-    auto nbytes = snprintf(write_buffer, 4096, "REG_ACTUATOR ir_remote");
-    write(socket_fd, write_buffer, nbytes);
+    //Register signals for "proper" shutdown
+    signal(SIGTERM, terminate);
+    signal(SIGINT, terminate);
 
-    //Get the response from the server
-    nbytes = read(socket_fd, receive_buffer, 4096);
+    // Init the server address
+    memset(&server_address, 0, sizeof(struct sockaddr_un));
+    server_address.sun_family = AF_UNIX;
+    snprintf(server_address.sun_path, UNIX_PATH_MAX, server_socket_path);
 
-    if(!nbytes){
-        std::cout << "asgard:ir: failed to register actuator" << std::endl;
-        return 1;
-    }
+    socklen_t address_length = sizeof(struct sockaddr_un);
 
-    receive_buffer[nbytes] = 0;
+    // Register the source
+    auto nbytes = snprintf(write_buffer, buffer_size, "REG_SOURCE ir");
+    sendto(socket_fd, write_buffer, nbytes, 0, (struct sockaddr *) &server_address, sizeof(struct sockaddr_un));
 
-    //Parse the actuator id
-    int actuator = atoi(receive_buffer);
-    std::cout << "remote actuator: " << actuator << std::endl;
+    auto bytes_received = recvfrom(socket_fd, receive_buffer, buffer_size, 0, (struct sockaddr *) &(server_address), &address_length);
+    receive_buffer[bytes_received] = '\0';
+
+    source_id = atoi(receive_buffer);
+
+    std::cout << "asgard:ir: remote source: " << source_id << std::endl;
+
+    // Register the button actuator
+    nbytes = snprintf(write_buffer, buffer_size, "REG_ACTUATOR %d %s", source_id, "ir_button_1");
+    sendto(socket_fd, write_buffer, nbytes, 0, (struct sockaddr *) &server_address, sizeof(struct sockaddr_un));
+
+    bytes_received = recvfrom(socket_fd, receive_buffer, buffer_size, 0, (struct sockaddr *) &(server_address), &address_length);
+    receive_buffer[bytes_received] = '\0';
+
+    button_actuator_id = atoi(receive_buffer);
+
+    std::cout << "asgard:ir: remote button actuator: " << button_actuator_id << std::endl;
 
     //Read the default LIRC config
     struct lirc_config* config;
@@ -102,7 +166,7 @@ int main(){
             //If code = NULL, nothing was returned from LIRC socket
             if(code){
                 //Send code further
-                ir_received(socket_fd, code, actuator);
+                ir_received(code);
 
                 //Need to free up code before the next loop
                 free(code);
@@ -115,11 +179,7 @@ int main(){
         std::cout << "asgard:ir: Failed to read LIRC config" << std::endl;
     }
 
-    //Closes LIRC
-    lirc_deinit();
-
-    //Close the socket
-    close(socket_fd);
+    stop();
 
     return 0;
 }
