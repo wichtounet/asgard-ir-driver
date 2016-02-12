@@ -26,7 +26,7 @@ debug: debug_ir_driver
 all: release release_debug debug
 
 run: release
-	sudo ./release/bin/ir_driver
+	./release/bin/ir_driver
 
 remote_clean:
 	sshpass -p ${password} ssh ${user}@${pi} "cd ${dir} && make clean"
