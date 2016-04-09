@@ -18,7 +18,7 @@ conf: pi.conf
 
 include pi.conf
 
-CXX_FLAGS += -pedantic
+CXX_FLAGS += -pedantic -Iasgard-lib/include
 LD_FLAGS  += -llirc_client
 
 $(eval $(call auto_folder_compile,src))
@@ -41,7 +41,7 @@ remote_make:
 	sshpass -p ${password} scp -p src/*.cpp ${user}@${pi}:${dir}/src/
 	sshpass -p ${password} ssh ${user}@${pi} "cd ${dir} && make"
 
-remote_make:
+remote_make_run:
 	sshpass -p ${password} scp -p Makefile ${user}@${pi}:${dir}/
 	sshpass -p ${password} scp -p src/*.cpp ${user}@${pi}:${dir}/src/
 	sshpass -p ${password} ssh ${user}@${pi} "cd ${dir} && make && make run"
