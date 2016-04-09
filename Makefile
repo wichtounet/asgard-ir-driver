@@ -1,17 +1,23 @@
 CXX=g++
 LD=g++
 
-user=pi
-pi=192.168.20.161
-password=raspberry
-dir=/home/${user}/asgard/asgard-ir-driver/
-
 default: release
 
 .PHONY: default release debug all clean
 
 include make-utils/flags-pi.mk
 include make-utils/cpp-utils.mk
+
+pi.conf:
+	echo "user=pi" > pi.conf
+	echo "pi=192.168.20.161" >> pi.conf
+	echo "password=raspberry" >> pi.conf
+	echo "dir=/home/pi/asgard/asgard-ir-driver/" >> pi.conf
+
+conf: pi.conf
+
+include pi.conf
+
 
 CXX_FLAGS += -pedantic
 LD_FLAGS  += -llirc_client
