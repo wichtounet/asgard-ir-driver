@@ -2,3 +2,5 @@ release
 release_debug
 debug
 pi.conf
+Makefile~
+src/driver.cpp~
