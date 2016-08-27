@@ -32,9 +32,6 @@ void stop(){
     asgard::unregister_actuator(driver, source_id, button_actuator_id);
     asgard::unregister_source(driver, source_id);
 
-    // Unlink the client socket
-    unlink(asgard::get_string_value(config, "ir_client_socket_path").c_str());
-
     // Close the socket
     close(driver.socket_fd);
 }
